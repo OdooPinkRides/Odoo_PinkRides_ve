@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_partner_form_pink" model="ir.ui.view">
+        <field name="name">res.partner.form.pink.routemanager</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page name="pink_routemanager" string="Pink RouteManager" groups="pink_routemanager.group_pink_routemanager">
+                    <group>
+                        <group string="Vinculación">
+                            <field name="pink_role"/>
+                            <field name="pink_routemanager_id" readonly="pink_routemanager_id"/>
+                            <field name="company_id" required="pink_role != False"/>
+                        </group>
+                        <group string="Identificación" invisible="not pink_role">
+                            <field name="pink_document_type" required="pink_role != False"/>
+                            <field name="pink_document_number" required="pink_role != False"/>
+                            <field name="pink_license" invisible="pink_role != 'driver'" required="pink_role == 'driver'"/>
+                            <field name="pink_employer_id" invisible="pink_role != 'driver'"/>
+                            <field name="pink_contact_name" invisible="pink_role != 'company'" required="pink_role == 'company'"/>
+                        </group>
+                    </group>
+                    <p invisible="not pink_role">Los contactos Pink necesitan nombre, teléfono y correo. Las empresas también necesitan dirección y responsable. No se importan pasajeros ni vehículos.</p>
+                </page>
+            </xpath>
+        </field>
+    </record>
+    <record id="action_pink_companies" model="ir.actions.act_window">
+        <field name="name">Empresas</field>
+        <field name="res_model">res.partner</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('pink_role', '=', 'company')]</field>
+        <field name="context">{'default_pink_role': 'company', 'default_is_company': True, 'default_company_id': allowed_company_ids[0]}</field>
+    </record>
+    <record id="action_pink_drivers" model="ir.actions.act_window">
+        <field name="name">Conductores</field>
+        <field name="res_model">res.partner</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('pink_role', '=', 'driver')]</field>
+        <field name="context">{'default_pink_role': 'driver', 'default_is_company': False, 'default_company_id': allowed_company_ids[0]}</field>
+    </record>
+</odoo>

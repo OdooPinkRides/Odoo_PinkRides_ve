@@ -1,0 +1,2 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_pink_trip,pink.routemanager.trip user,model_pink_routemanager_trip,group_pink_routemanager,1,1,1,0

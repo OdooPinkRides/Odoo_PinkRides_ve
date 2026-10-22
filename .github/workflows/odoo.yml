@@ -1,0 +1,52 @@
+name: Odoo 19 module checks
+
+on:
+  push:
+    branches: [calidad]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  module:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: odoo
+          POSTGRES_PASSWORD: odoo-test-only
+          POSTGRES_DB: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U odoo"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Static contract checks
+        run: python tests/test_structure.py
+      - name: Odoo system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libldap2-dev libsasl2-dev libpq-dev libxml2-dev libxslt1-dev libjpeg-dev libssl-dev libffi-dev liblcms2-dev libopenjp2-7-dev
+      - name: Fetch official Odoo 19 and install dependencies
+        run: |
+          git clone --depth 1 --branch 19.0 https://github.com/odoo/odoo.git "$RUNNER_TEMP/odoo"
+          git -C "$RUNNER_TEMP/odoo" rev-parse HEAD
+          python -m pip install -r "$RUNNER_TEMP/odoo/requirements.txt"
+      - name: Install module and run ORM/security tests on disposable database
+        env:
+          ODOO_SOURCE: ${{ runner.temp }}/odoo
+          PGPASSWORD: odoo-test-only
+        run: bash tests/run_odoo.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: odoo-test-logs
+          path: tests/artifacts/

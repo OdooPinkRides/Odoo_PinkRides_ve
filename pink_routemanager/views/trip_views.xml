@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pink_trip_list" model="ir.ui.view">
+        <field name="name">pink.routemanager.trip.list</field>
+        <field name="model">pink.routemanager.trip</field>
+        <field name="arch" type="xml">
+            <list delete="0" decoration-muted="state == 'CANCELLED'">
+                <field name="date"/>
+                <field name="routemanager_id"/>
+                <field name="customer_id"/>
+                <field name="driver_id"/>
+                <field name="distance_km" sum="Kilómetros"/>
+                <field name="uom_id"/>
+                <field name="passenger_type" optional="hide"/>
+                <field name="state"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_pink_trip_form" model="ir.ui.view">
+        <field name="name">pink.routemanager.trip.form</field>
+        <field name="model">pink.routemanager.trip</field>
+        <field name="arch" type="xml">
+            <form string="Viaje RouteManager" delete="0">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="routemanager_id" readonly="id"/>
+                            <field name="date"/>
+                            <field name="customer_id" options="{'no_create': True}"/>
+                            <field name="driver_id" options="{'no_create': True}"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                        <group>
+                            <field name="product_id" readonly="1"/>
+                            <field name="distance_km"/>
+                            <field name="uom_id"/>
+                            <field name="passenger_type"/>
+                            <field name="state"/>
+                            <field name="active" invisible="1"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="view_pink_trip_search" model="ir.ui.view">
+        <field name="name">pink.routemanager.trip.search</field>
+        <field name="model">pink.routemanager.trip</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="routemanager_id"/>
+                <field name="customer_id"/>
+                <field name="driver_id"/>
+                <filter name="completed" string="Completados" domain="[('state', '=', 'COMPLETED')]"/>
+                <filter name="cancelled" string="Cancelados" domain="[('state', '=', 'CANCELLED')]"/>
+                <filter name="archived" string="Archivados" domain="[('active', '=', False)]"/>
+                <group>
+                    <filter name="by_customer" string="Empresa" context="{'group_by': 'customer_id'}"/>
+                    <filter name="by_driver" string="Conductor" context="{'group_by': 'driver_id'}"/>
+                    <filter name="by_date" string="Mes" context="{'group_by': 'date:month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+    <record id="action_pink_trips" model="ir.actions.act_window">
+        <field name="name">Viajes</field>
+        <field name="res_model">pink.routemanager.trip</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_pink_trip_search"/>
+    </record>
+    <menuitem id="menu_pink_root" name="Pink RouteManager" sequence="40" groups="pink_routemanager.group_pink_routemanager"/>
+    <menuitem id="menu_pink_trips" name="Viajes" parent="menu_pink_root" action="action_pink_trips" sequence="10"/>
+    <menuitem id="menu_pink_companies" name="Empresas" parent="menu_pink_root" action="action_pink_companies" sequence="20"/>
+    <menuitem id="menu_pink_drivers" name="Conductores" parent="menu_pink_root" action="action_pink_drivers" sequence="30"/>
+</odoo>
