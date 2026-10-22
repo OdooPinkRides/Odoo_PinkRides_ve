@@ -1,5 +1,5 @@
 Pink RouteManager (Odoo 19)
-==========================
+===========================
 
 Módulo administrativo para preparar la sincronización RouteManager -> Odoo.
 No activa una sincronización automática ni modifica el backend de RouteManager.
@@ -63,7 +63,7 @@ altera la localización contable o el campo fiscal nativo ``vat``. Si se recuper
 esa localización, habrá que acordar el mapeo documental antes de sincronizarla.
 
 Viajes e identidad
------------------
+------------------
 
 ``routemanager_id`` es el UUID canónico del viaje. ``customer_id`` se resuelve
 mediante ``Trip.companyId`` y ``driver_id`` mediante el conductor efectivo del

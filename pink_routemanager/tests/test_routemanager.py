@@ -87,7 +87,7 @@ class TestPinkRouteManager(TransactionCase):
 
     @mute_logger("odoo.sql_db")
     def test_duplicate_contact_external_id_is_rejected(self):
-        with self.assertRaises((ValidationError, IntegrityError)), self.cr.savepoint():
+        with self.assertRaises(IntegrityError), self.cr.savepoint():
             self.partner.create(
                 {
                     **self._contact_values("driver"),
@@ -150,7 +150,7 @@ class TestPinkRouteManager(TransactionCase):
             self.trip.create(values)
         trip = self.trip.create(self._trip_values(state="CANCELLED"))
         with self.assertRaises(ValidationError), self.cr.savepoint():
-            trip.distance_km = False
+            trip.write({"distance_km": False})
 
     def test_foreign_service_or_unit_is_rejected(self):
         other_product = self.env["product.product"].create(
@@ -174,7 +174,7 @@ class TestPinkRouteManager(TransactionCase):
     @mute_logger("odoo.sql_db")
     def test_trip_external_id_is_unique_and_immutable(self):
         trip = self.trip.create(self._trip_values())
-        with self.assertRaises((ValidationError, IntegrityError)), self.cr.savepoint():
+        with self.assertRaises(IntegrityError), self.cr.savepoint():
             self.trip.create(self._trip_values(routemanager_id=trip.routemanager_id))
             self.trip.flush_model()
         with self.assertRaises(ValidationError), self.cr.savepoint():
@@ -203,7 +203,9 @@ class TestPinkRouteManager(TransactionCase):
 
     def test_driver_sensitive_fields_require_pink_group(self):
         outsider = new_test_user(
-            self.env, login="pink_contact_outsider", groups="base.group_user"
+            self.env,
+            login="pink_contact_outsider",
+            groups="base.group_user,base.group_partner_manager",
         )
         with self.assertRaises(AccessError), self.cr.savepoint():
             self.driver.with_user(outsider).read(
@@ -218,7 +220,7 @@ class TestPinkRouteManager(TransactionCase):
         other_company = self.env["res.company"].create(
             {"name": "Otra compañía de prueba"}
         )
-        with self.assertRaises((UserError, AccessError)), self.cr.savepoint():
+        with self.assertRaises(UserError), self.cr.savepoint():
             self.trip.create(self._trip_values(company_id=other_company.id))
 
     def test_access_group_and_company_isolation(self):

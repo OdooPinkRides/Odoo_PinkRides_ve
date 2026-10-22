@@ -138,27 +138,30 @@ class RouteManagerTrip(models.Model):
                     )
                 )
 
+    @api.model
+    def _check_distance_value(self, value):
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(value)
+            or value < 0
+        ):
+            raise ValidationError(
+                self.env._(
+                    "Envíe kilómetros numéricos, finitos y no negativos; un dato desconocido no equivale a cero."
+                )
+            )
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
-            if vals.get("distance_km") is None or isinstance(vals["distance_km"], bool):
-                raise ValidationError(
-                    _(
-                        "Envíe los kilómetros explícitamente; un dato desconocido no equivale a cero."
-                    )
-                )
+            self._check_distance_value(vals.get("distance_km"))
         return super().create(vals_list)
 
     def write(self, vals):
         self.check_access("write")
-        if "distance_km" in vals and (
-            vals["distance_km"] is None or isinstance(vals["distance_km"], bool)
-        ):
-            raise ValidationError(
-                _(
-                    "Envíe los kilómetros explícitamente; un dato desconocido no equivale a cero."
-                )
-            )
+        if "distance_km" in vals:
+            self._check_distance_value(vals["distance_km"])
         if "routemanager_id" in vals and any(
             trip.routemanager_id != vals["routemanager_id"] for trip in self
         ):
