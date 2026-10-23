@@ -33,6 +33,32 @@ class TestModuleStructure(unittest.TestCase):
             (ADDON / "tests/__init__.py").read_text(encoding="utf-8"),
         )
 
+    def test_quality_keeps_existing_purchase_field_provider(self):
+        # The quality database still uses views from the original custom addons.
+        baseline = ROOT / "Localizacion_contable/base_contable"
+        self.assertTrue((baseline / "__manifest__.py").is_file())
+        self.assertTrue(
+            (ROOT / "Facturacion Digital/factura_digital_unidigital/__manifest__.py").is_file()
+        )
+        self.assertIn(
+            "from . import model", (baseline / "__init__.py").read_text(encoding="utf-8")
+        )
+        self.assertIn(
+            "from . import sale_purchase_order",
+            (baseline / "model/__init__.py").read_text(encoding="utf-8"),
+        )
+        model = ast.parse(
+            (baseline / "model/sale_purchase_order.py").read_text(encoding="utf-8")
+        )
+        purchase = next(node for node in model.body if isinstance(node, ast.ClassDef)
+                        and node.name == "PurchaseOrder")
+        assignments = {node.targets[0].id: node.value for node in purchase.body
+                       if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name)}
+        self.assertEqual(ast.literal_eval(assignments["_inherit"]), "purchase.order")
+        self.assertEqual(assignments["x_tasa"].func.attr, "Float")
+        view = ElementTree.parse(baseline / "vista/purchase_inherit.xml")
+        self.assertIsNotNone(view.find(".//field[@name='x_tasa']"))
+
     def test_trip_access_requires_group_and_has_no_delete(self):
         with (ADDON / "security/ir.model.access.csv").open(
             encoding="utf-8", newline=""
