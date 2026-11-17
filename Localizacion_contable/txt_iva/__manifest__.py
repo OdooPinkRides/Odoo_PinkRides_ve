@@ -8,7 +8,6 @@
        Archivo txt iva proveedores seniat
     """,
     'version': '18.0',
-    'license': 'LGPL-3',
     'author': 'Ing. Darrell Sojo',
     'category': 'Tools',
 

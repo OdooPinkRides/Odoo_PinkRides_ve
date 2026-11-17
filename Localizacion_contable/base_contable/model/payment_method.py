@@ -39,7 +39,6 @@ class AccountPaymentMethod(models.Model):
 class LineJournal(models.Model):
 
     _name = 'account.payment.method_journal'
-    _description = "Métodos de pago por diario"
 
     payment_method_id = fields.Many2one('account.payment.method')
     journal_id = fields.Many2one('account.journal')

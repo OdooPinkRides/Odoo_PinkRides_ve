@@ -17,7 +17,6 @@ import xml.etree.ElementTree as ET
 
 class LibroComprasModelo(models.Model):
     _name = "libro.diario.wizard.pdf"
-    _description = "Asistente PDF Libro Diario"
 
     fecha_desde=fields.Date()
     fecha_hasta=fields.Date()

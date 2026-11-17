@@ -8,7 +8,6 @@
        Reporte del Libro diario v19.
     """,
     'version': '18.0',
-    'license': 'LGPL-3',
     'author': 'Darrell Sojo',
     'category': 'Tools',
     'website': 'dsojo.tranfe@gmail.com',
