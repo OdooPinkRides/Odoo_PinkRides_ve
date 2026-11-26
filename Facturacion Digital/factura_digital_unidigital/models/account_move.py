@@ -11,6 +11,11 @@ from odoo.tools import html2plaintext
 _logger = logging.getLogger(__name__)
 
 
+class _UnidigitalRejected(Exception):
+    """Señal interna para revertir el savepoint cuando Unidigital rechaza el documento."""
+    pass
+
+
 class AccountMove(models.Model):
     _inherit = "account.move"
 
@@ -80,15 +85,78 @@ class AccountMove(models.Model):
 
     
 
+    def _validate_unidigital_partner(self):
+        """Valida que el cliente tenga un RIF/Cédula numérico válido antes de emitir."""
+        for move in self:
+            partner = move.partner_id
+            vat_clean = (partner.vat or '').replace('-', '').replace(' ', '').strip().upper()
+            raw_number = vat_clean[1:] if vat_clean and vat_clean[0].isalpha() else vat_clean
+            digits_only = ''.join(filter(str.isdigit, raw_number))
+            if not digits_only or int(digits_only) == 0:
+                raise UserError(_(
+                    "El cliente '%s' no tiene un RIF/Cédula válido configurado. "
+                    "Actualice el campo RIF antes de confirmar la factura digital."
+                ) % (partner.display_name or ''))
+
+    def _restore_standard_sequences(self, seq_doc, old_doc_next, seq_ctrl, old_ctrl_next):
+        """Restaura secuencias 'standard' (PostgreSQL nextval) si el envío a Unidigital se revierte."""
+        if seq_doc and seq_doc.implementation == 'standard' and old_doc_next:
+            seq_doc.invalidate_recordset(['number_next_actual'])
+            if seq_doc.number_next_actual != old_doc_next:
+                seq_doc.sudo().write({'number_next_actual': old_doc_next})
+        if seq_ctrl and seq_ctrl.implementation == 'standard' and old_ctrl_next:
+            seq_ctrl.invalidate_recordset(['number_next_actual'])
+            if seq_ctrl.number_next_actual != old_ctrl_next:
+                seq_ctrl.sudo().write({'number_next_actual': old_ctrl_next})
+
     def confirmar2(self):
         for rec in self:
-            if rec.company_id.usar_fact_digi==True:
-                rec.valida_pagos_progra_contado()
-                #rec.action_post()
-                if rec.code!='200':
-                    rec.enviar_fact_digital()
-                if rec.code=='200':
+            if not rec.company_id.usar_fact_digi:
+                continue
+
+            rec.valida_pagos_progra_contado()
+
+            # Si el documento ya fue aprobado previamente por Unidigital,
+            # solo confirmamos en Odoo sin reenviar a la imprenta digital.
+            if rec.code == '200' and rec.hasErrors != 'True':
+                rec.action_post()
+                continue
+
+            rec._validate_unidigital_partner()
+
+            seq_doc = rec.journal_id.doc_sequence_id
+            seq_ctrl = rec.journal_id.ctrl_sequence_id
+            old_doc_next = seq_doc.number_next_actual if seq_doc else False
+            old_ctrl_next = seq_ctrl.number_next_actual if seq_ctrl else False
+
+            api_error_vals = None
+            try:
+                # 1) Primero validamos y confirmamos en Odoo dentro de un savepoint.
+                #    Si falla cualquier validación (precio <= 0, falta impuesto, falta
+                #    cuenta IGTF, pago de contado, etc.), falla aquí y JAMÁS viaja a Unidigital.
+                with self.env.cr.savepoint():
                     rec.action_post()
+                    # 2) Solo si Odoo validó y confirmó sin errores, enviamos a Unidigital
+                    #    con el número real asignado por la secuencia.
+                    rec.enviar_fact_digital()
+                    if rec.code != '200' or rec.hasErrors == 'True':
+                        api_error_vals = {
+                            'code': rec.code,
+                            'hasErrors': rec.hasErrors,
+                            'result': rec.result,
+                            'information': rec.information,
+                            'errorMessage': rec.errorMessage,
+                            'json_enviado': rec.json_enviado,
+                        }
+                        raise _UnidigitalRejected()
+            except _UnidigitalRejected:
+                rec.invalidate_recordset()
+                rec._restore_standard_sequences(seq_doc, old_doc_next, seq_ctrl, old_ctrl_next)
+                if api_error_vals:
+                    rec.write(api_error_vals)
+            except Exception:
+                rec._restore_standard_sequences(seq_doc, old_doc_next, seq_ctrl, old_ctrl_next)
+                raise
 
     def valida_pagos_progra_contado(self):
         # ELIMINAMOS la restricción que evitaba las Notas de Crédito (refund)
@@ -137,6 +205,11 @@ class AccountMove(models.Model):
             
             # Solo extraer dígitos numéricos
             digits_only = ''.join(filter(str.isdigit, raw_number))
+            if not digits_only or int(digits_only) == 0:
+                raise UserError(_(
+                    "El cliente '%s' no tiene un RIF/Cédula válido configurado. "
+                    "Actualice el campo RIF antes de emitir la factura digital."
+                ) % (partner.display_name or ''))
 
             # Para Jurídicos (J, G, C, E, etc.) la API exige exactamente 9 dígitos.
             # Se aplican ceros a la izquierda (.zfill(9)).
@@ -149,8 +222,11 @@ class AccountMove(models.Model):
             exchange_rate = getattr(move, 'tasa', 1.0) or 1.0
             emission_date = (move.invoice_date or fields.Date.today()).strftime('%Y-%m-%dT%H:%M:%S.000Z')
 
-            # 5. Filtrar líneas válidas
-            lines = move.invoice_line_ids.filtered(lambda l: l.display_type not in ('line_section', 'line_note'))
+            # 5. Filtrar líneas válidas (excluye secciones, notas y línea sintética de IGTF)
+            lines = move.invoice_line_ids.filtered(
+                lambda l: l.display_type not in ('line_section', 'line_note')
+                and not getattr(l, 'linea_exenta', False)
+            )
             if not lines:
                 raise UserError(_("La factura no contiene líneas de productos/servicios válidas para enviar."))
 
@@ -295,12 +371,16 @@ class AccountMove(models.Model):
             if move.narration:
                 note1_clean = html2plaintext(move.narration).strip()
 
+            doc_num_source = getattr(move, 'invoice_number_next', False) or move.proximo_doc or "0"
+            doc_num_digits = ''.join(filter(str.isdigit, str(doc_num_source)))
+            doc_number = int(doc_num_digits) if doc_num_digits else 0
+
             # 6. Payload Final hacia Unidigital
             payload = {
                 "SerieStrongId": company.seriestrongid,
                 "SucursalStrongId": company.sucursal_strong_id or "81e836fe-eff1-4ca7-bcfd-5f079a44a503",
                 "DocumentType": document_type,
-                "Number": int(move.proximo_doc or 0),
+                "Number": doc_number,
                 "EmissionDateAndTime": emission_date,
                 "Name": partner.name or "Cliente Generico",
                 "FiscalRegistryCode": fiscal_code,
@@ -392,7 +472,12 @@ class AccountMove(models.Model):
                 
                 # Guarda el status code HTTP (200, 405, 500, etc.)
                 http_status = response.status_code
-                res_json = response.json() if response.content else {}
+                try:
+                    res_json = response.json() if response.content else {}
+                except ValueError:
+                    res_json = {}
+                if not isinstance(res_json, dict):
+                    res_json = {}
 
                 # Si el JSON trae su propio campo "code", lo usa; de lo contrario toma el código de estado HTTP
                 move.code = str(res_json.get("code") if res_json.get("code") is not None else http_status)
