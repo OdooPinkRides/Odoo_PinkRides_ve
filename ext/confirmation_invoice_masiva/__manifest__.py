@@ -1,10 +1,10 @@
 {
     'name': 'Confirmation Invoice Masiva',
-    'version': '19.0.0.10.0',
+    'version': '19.0.0.11.0',
     'summary': 'Aprobacion de facturas Masivas',
     'description': """
         Aprobacion de facturas Masivas, adjunto PDF fiscal Unidigital sin botón View Invoice,
-        y campo Código de Conductora en la ficha de contactos.
+        y campo Código en la ficha de contactos.
     """,
     'category': 'Account',
     'author': 'Silicon Valley Latam coladorador:Ing.Marilynmillan',
