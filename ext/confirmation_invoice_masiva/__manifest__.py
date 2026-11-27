@@ -1,6 +1,6 @@
 {
     'name': 'Confirmation Invoice Masiva',
-    'version': '19.0.0.9.0',
+    'version': '19.0.0.10.0',
     'summary': 'Aprobacion de facturas Masivas',
     'description': """
         Aprobacion de facturas Masivas, adjunto PDF fiscal Unidigital sin botón View Invoice,

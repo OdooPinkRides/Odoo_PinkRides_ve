@@ -5,7 +5,7 @@
         <field name="name">account.move.mass.confirm.form</field>
         <field name="model">account.move.mass.confirm</field>
         <field name="arch" type="xml">
-            <form string="Aprobar Invoice masiva">
+            <form string="Confirmar Facturas Masivamente">
                 <group>
                     <group>
                         <field name="date_from"/>
@@ -17,14 +17,14 @@
                     </group>
                 </group>
                 <footer>
-                    <button name="action_confirm_invoices" string="Confirmar Facturas" type="object" class="btn-primary" data-hotkey="q"/>
+                    <button name="action_confirm_invoices" string="Confirmar y Enviar a Unidigital" type="object" class="btn-primary" data-hotkey="q"/>
                     <button string="Cancelar" class="btn-secondary" special="cancel" data-hotkey="z"/>
                 </footer>
             </form>
         </field>
     </record>
 
-    <!-- Acción del Wizard (Menú general o botón) -->
+    <!-- Acción del Wizard (Menú general o acción en lista de facturas) -->
     <record id="action_account_move_mass_confirm" model="ir.actions.act_window">
         <field name="name">Confirmar Facturas Masivamente</field>
         <field name="res_model">account.move.mass.confirm</field>
@@ -35,7 +35,7 @@
 
     <!-- Menú en Contabilidad para llamar al asistente sin selección -->
     <menuitem id="menu_account_move_mass_confirm"
-              name="Aprobasion Invoice"
+              name="Confirmación Masiva Facturas"
               parent="account.menu_finance_entries"
               action="action_account_move_mass_confirm"
               sequence="25"/>
